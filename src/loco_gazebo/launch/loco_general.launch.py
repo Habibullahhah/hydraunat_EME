@@ -22,15 +22,15 @@ def generate_launch_description():
         description='Name of the world file to load'
     )
 
-    # 3. Start Gazebo
-    # FIX: We explicitly load the factory plugin using --verbose for debugging
+    # 3. Include Gazebo Launch (FIXED INDENTATION HERE)
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_gazebo_ros, 'launch', 'gazebo.launch.py')
         ),
         launch_arguments={
-            'world': PathJoinSubstitution([pkg_loco_gazebo, 'worlds', LaunchConfiguration('world_name')]),
-            'extra_gazebo_args': '--verbose -s libgazebo_ros_factory.so' 
+            'world': PathJoinSubstitution([pkg_loco_gazebo, 'worlds', 'loco.world']),
+            'verbose': 'true',
+            'pause': 'false',
         }.items()
     )
 
@@ -66,7 +66,9 @@ def generate_launch_description():
     # 7. Physics Control Node (Your Python Script)
     sim_control = Node(
         package='loco_gazebo',
-        executable='sim_control_node.py',
+        # Note: Ensure in your setup.py entry_points that this is named exactly 'sim_control_node.py'
+        # usually ROS2 entry points do not have the .py extension in the executable name.
+        executable='sim_control_node.py', 
         name='sim_control',
         output='screen'
     )

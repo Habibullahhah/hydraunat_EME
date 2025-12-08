@@ -9,10 +9,16 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>gazebo_dev</depend>
+  <depend>gazebo_ros</depend>
+  <depend>rclcpp</depend>
+
   <exec_depend>rclpy</exec_depend>
   <exec_depend>gazebo_ros_pkgs</exec_depend>
-  <exec_depend>loco_description</exec_depend>
   <exec_depend>loco_pilot</exec_depend>
 
-  <export><build_type>ament_cmake</build_type></export>
+  <export>
+    <build_type>ament_cmake</build_type>
+    <gazebo_ros plugin_path="${prefix}/lib/loco_gazebo"/>
+  </export>
 </package>

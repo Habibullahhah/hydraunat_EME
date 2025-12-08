@@ -8,65 +8,67 @@ class SimControlNode(Node):
     def __init__(self):
         super().__init__('sim_control_node')
 
-        # --- CONFIGURATION ---
-        self.max_force = 23.15 # Newtons per thruster
+        self.max_force = 15.0 # Balanced power
         
-        # Internal State
-        self.throttle_cmd = 0.0
-        self.yaw_cmd = 0.0
-        self.pitch_cmd = 0.0
+        self.cmd_surge = 0.0
+        self.cmd_yaw   = 0.0
+        self.cmd_heave = 0.0
 
-        # --- PUBLISHERS ---
-        # We publish to the remapped topics we set in the URDF
-        self.pub_left = self.create_publisher(Wrench, "/left_thrust", 1)
-        self.pub_right = self.create_publisher(Wrench, "/right_thrust", 1)
-        self.pub_vert = self.create_publisher(Wrench, "/vertical_thrust", 1)
+        # Topics match the URDF naming
+        self.pub_fl = self.create_publisher(Wrench, "/loco/thruster_fl_cmd", 1)
+        self.pub_fr = self.create_publisher(Wrench, "/loco/thruster_fr_cmd", 1)
+        self.pub_bl = self.create_publisher(Wrench, "/loco/thruster_bl_cmd", 1)
+        self.pub_br = self.create_publisher(Wrench, "/loco/thruster_br_cmd", 1)
+        self.pub_cl = self.create_publisher(Wrench, "/loco/thruster_cl_cmd", 1)
+        self.pub_cr = self.create_publisher(Wrench, "/loco/thruster_cr_cmd", 1)
         
-        # --- SUBSCRIBERS ---
-        # Listen for keyboard commands
         self.create_subscription(Command, "/loco/command", self.command_callback, 10)
-
-        # --- TIMER (The Heartbeat) ---
-        # Run this loop at 20Hz (every 0.05 seconds)
         self.create_timer(0.05, self.control_loop)
-
-        self.get_logger().info("LoCO Physics Node (Timer Based) Started")
+        self.get_logger().info("LoCO Vectored Control Started")
 
     def command_callback(self, msg):
-        # Just store the latest command
-        self.throttle_cmd = msg.throttle
-        self.yaw_cmd = msg.yaw
-        self.pitch_cmd = msg.pitch
+        self.cmd_surge = msg.throttle
+        self.cmd_yaw   = msg.yaw
+        self.cmd_heave = msg.pitch 
 
     def control_loop(self):
-        # 1. Calculate Forces based on stored commands
+        # --- MIXING MATRIX (Diagonal Opposing Logic) ---
         
-        # Vertical is simple direct mapping
-        f_vert = self.max_force * self.pitch_cmd
+        # 1. Vertical
+        f_cl = self.cmd_heave * self.max_force
+        f_cr = self.cmd_heave * self.max_force
 
-        # Differential Thrust Logic (Tank Drive style mixing)
-        # Left = Throttle + Yaw
-        # Right = Throttle - Yaw
-        f_left = self.max_force * (self.throttle_cmd - self.yaw_cmd)
-        f_right = self.max_force * (self.throttle_cmd + self.yaw_cmd)
+        # 2. Horizontal
+        # To Turn (Yaw):
+        # We need pairs (FR, BL) to fight (FL, BR)
+        
+        # Front Left:  Forward(+) + Yaw(-) -> Pushes back to turn left
+        f_fl = (self.cmd_surge - self.cmd_yaw) * self.max_force
+        
+        # Front Right: Forward(+) + Yaw(+) -> Pushes forward to turn left
+        f_fr = (self.cmd_surge + self.cmd_yaw) * self.max_force
+        
+        # Back Left:   Forward(+) + Yaw(+) -> Pushes forward to turn left
+        f_bl = (self.cmd_surge + self.cmd_yaw) * self.max_force
+        
+        # Back Right:  Forward(+) + Yaw(-) -> Pushes back to turn left
+        f_br = (self.cmd_surge - self.cmd_yaw) * self.max_force
 
-        # 2. Create Messages
-        msg_left = Wrench()
-        msg_left.force.x = float(f_left)
+        # Publish
+        self.publish_force(self.pub_fl, f_fl)
+        self.publish_force(self.pub_fr, f_fr)
+        self.publish_force(self.pub_bl, f_bl)
+        self.publish_force(self.pub_br, f_br)
+        self.publish_force(self.pub_cl, f_cl, axis='z')
+        self.publish_force(self.pub_cr, f_cr, axis='z')
 
-        msg_right = Wrench()
-        msg_right.force.x = float(f_right)
-
-        msg_vert = Wrench()
-        msg_vert.force.z = float(f_vert) # Vertical pushes up/down (Z axis)
-
-        # 3. Publish!
-        self.pub_left.publish(msg_left)
-        self.pub_right.publish(msg_right)
-        self.pub_vert.publish(msg_vert)
-
-        # Debug logging (Optional: Un-comment to see values in terminal)
-        # self.get_logger().info(f"L: {f_left:.2f} | R: {f_right:.2f} | V: {f_vert:.2f}")
+    def publish_force(self, publisher, value, axis='x'):
+        msg = Wrench()
+        if axis == 'x':
+            msg.force.x = float(value)
+        elif axis == 'z':
+            msg.force.z = float(value)
+        publisher.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)
