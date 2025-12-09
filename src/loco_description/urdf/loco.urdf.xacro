@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="loco" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <material name="Blue"> <color rgba="0.79 0.82 0.93 1" /> </material>
+  <material name="DarkGray"> <color rgba="0.3 0.3 0.3 1" /> </material>
+  <material name="White"> <color rgba="1 1 1 1" /> </material>
+
+  <link name="loco_base_frame">
+    <inertial>
+      <mass value="0.001"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <joint name="base_frame_to_chassis" type="fixed">
+    <parent link="loco_base_frame"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="1.6284" />
+      <inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.02" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry> <mesh filename="package://loco_description/meshes/base_link.STL" /> </geometry>
+      <material name="Blue" />
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry> <cylinder length="0.4" radius="0.08"/> </geometry>
+    </collision>
+  </link>
+
+  <xacro:macro name="make_thruster" params="suffix stl_file x y z axis_x axis_y axis_z">
+    <link name="thruster_${suffix}">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <mass value="0.1" />
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry> <mesh filename="package://loco_description/meshes/${stl_file}" /> </geometry>
+        <material name="DarkGray" />
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 ${pi/2} 0" /> 
+        <geometry> <cylinder length="0.1" radius="0.02"/> </geometry>
+      </collision>
+    </link>
+
+    <joint name="joint_${suffix}" type="continuous">
+      <origin xyz="${x} ${y} ${z}" rpy="0 0 0" />
+      <parent link="base_link" />
+      <child link="thruster_${suffix}" />
+      <axis xyz="${axis_x} ${axis_y} ${axis_z}" />
+      <dynamics damping="5.0" friction="2.0"/>
+    </joint>
+
+    <gazebo>
+      <plugin filename="libgazebo_ros_force.so" name="gazebo_ros_force_${suffix}">
+        <ros> <namespace>loco</namespace> <remapping>gazebo_ros_force:=/loco/thruster_${suffix}_cmd</remapping> </ros>
+        <link_name>thruster_${suffix}</link_name> <force_frame>link</force_frame>
+      </plugin>
+    </gazebo>
+    
+    <gazebo reference="thruster_${suffix}"> <material>Gazebo/DarkGrey</material> </gazebo>
+  </xacro:macro>
+
+  <xacro:make_thruster suffix="fl" stl_file="link_FL.STL" x="0.191" y="0.178" z="-0.002" axis_x="0.707" axis_y="-0.707" axis_z="0" />
+  
+  <xacro:make_thruster suffix="fr" stl_file="Link_FR.STL" x="0.190" y="-0.177" z="-0.002" axis_x="0.707" axis_y="0.707" axis_z="0" />
+  
+  <xacro:make_thruster suffix="bl" stl_file="Link_BL.STL" x="-0.203" y="0.166" z="-0.002" axis_x="0.707" axis_y="0.707" axis_z="0" />
+  
+  <xacro:make_thruster suffix="br" stl_file="Link_BR.STL" x="-0.204" y="-0.166" z="0.000" axis_x="0.707" axis_y="-0.707" axis_z="0" />
+  
+  <xacro:make_thruster suffix="cl" stl_file="Link_CL.STL" x="-0.002" y="0.136" z="-0.011" axis_x="0" axis_y="0" axis_z="1" />
+  <xacro:make_thruster suffix="cr" stl_file="link_CR.STL" x="-0.003" y="-0.135" z="-0.010" axis_x="0" axis_y="0" axis_z="1" />
+
+  <gazebo reference="base_link">
+    <material>Gazebo/GreyTransparent</material>
+  </gazebo>
+
+  <gazebo>
+    <plugin name="simple_hydrodynamics" filename="libsimple_hydrodynamics.so">
+    </plugin>
+  </gazebo>
+
+</robot>
